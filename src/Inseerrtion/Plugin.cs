@@ -22,8 +22,9 @@ namespace Inseerrtion
     public class Plugin : BasePlugin<PluginConfiguration>, IHasThumbImage, IHasUIPages
     {
         private readonly ILogger _logger;
-        private readonly UserMappingService _userMappingService;
+        private UserMappingService? _userMappingService;
         private readonly IServerApplicationHost _applicationHost;
+        private readonly IApplicationPaths _applicationPaths;
         private List<IPluginUIPageController>? _pages;
 
         // Plugin ID - MUST be unique and stable
@@ -32,27 +33,62 @@ namespace Inseerrtion
         /// <summary>
         /// Initializes a new instance of the <see cref="Plugin"/> class.
         /// </summary>
-        /// <param name="applicationPaths">The application paths.</param>
         /// <param name="xmlSerializer">The XML serializer.</param>
         /// <param name="logManager">The log manager.</param>
-        /// <param name="applicationHost">The application host.</param>
+        /// <param name="applicationHost">The application host (also provides IApplicationPaths).</param>
         public Plugin(
-            IApplicationPaths applicationPaths,
             IXmlSerializer xmlSerializer,
             ILogManager logManager,
             IServerApplicationHost applicationHost)
-            : base(applicationPaths, xmlSerializer)
+            : base(GetApplicationPaths(applicationHost), xmlSerializer)
         {
-            _applicationHost = applicationHost ?? throw new ArgumentNullException(nameof(applicationHost));
-            _logger = logManager?.GetLogger(Name) ?? throw new ArgumentNullException(nameof(logManager));
-            _userMappingService = new UserMappingService(_logger, Configuration, applicationPaths);
-            _logger.Info("Inseerrtion plugin loaded - version {0}", Version.ToString());
+            try
+            {
+                _applicationHost = applicationHost ?? throw new ArgumentNullException(nameof(applicationHost));
+                _applicationPaths = (applicationHost as IApplicationPaths) 
+                    ?? throw new InvalidOperationException("IServerApplicationHost must implement IApplicationPaths");
+                _logger = logManager?.GetLogger(Name) ?? throw new ArgumentNullException(nameof(logManager));
+                
+                _logger.Info("Inseerrtion plugin loaded - version {0}", Version.ToString());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"CRITICAL ERROR in Inseerrtion plugin constructor: {ex}");
+                throw;
+            }
         }
 
         /// <summary>
-        /// Gets the user mapping service.
+        /// Gets IApplicationPaths from the application host.
         /// </summary>
-        public UserMappingService UserMappingService => _userMappingService;
+        private static IApplicationPaths GetApplicationPaths(IServerApplicationHost host)
+        {
+            if (host == null)
+                throw new ArgumentNullException(nameof(host));
+            
+            // Try to cast IServerApplicationHost to IApplicationPaths
+            if (host is IApplicationPaths paths)
+                return paths;
+            
+            throw new InvalidOperationException(
+                "IServerApplicationHost does not implement IApplicationPaths. " +
+                "This plugin requires an Emby version where the application host provides path information.");
+        }
+
+        /// <summary>
+        /// Gets the user mapping service (lazy-initialized).
+        /// </summary>
+        public UserMappingService UserMappingService
+        {
+            get
+            {
+                if (_userMappingService == null)
+                {
+                    _userMappingService = new UserMappingService(_logger, Configuration, _applicationPaths);
+                }
+                return _userMappingService;
+            }
+        }
 
         /// <inheritdoc />
         public override string Name => "Inseerrtion";
@@ -73,9 +109,18 @@ namespace Inseerrtion
             {
                 if (_pages == null)
                 {
-                    _pages = new List<IPluginUIPageController>();
-                    _pages.Add(new ConfigPageController(CreatePluginInfo(), Configuration, _logger));
-                    _pages.Add(new SearchPageController(CreatePluginInfo(), _logger, this));
+                    try
+                    {
+                        _pages = new List<IPluginUIPageController>();
+                        _pages.Add(new ConfigPageController(CreatePluginInfo(), Configuration, _logger));
+                        _pages.Add(new SearchPageController(CreatePluginInfo(), _logger, this));
+                        _logger.Debug("UIPageControllers initialized with {0} pages", _pages.Count);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.ErrorException("Failed to initialize UIPageControllers", ex);
+                        _pages = new List<IPluginUIPageController>();
+                    }
                 }
 
                 return _pages.AsReadOnly();

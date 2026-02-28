@@ -117,6 +117,12 @@ namespace Inseerrtion.UI.Configuration
         /// </summary>
         private async Task UpdateConnectionStatusAsync()
         {
+            if (_configuration == null)
+            {
+                _logger.Error("Configuration is null in UpdateConnectionStatusAsync");
+                return;
+            }
+
             try
             {
                 using var client = new SeerrClient(_logger, _configuration);
