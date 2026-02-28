@@ -1,0 +1,183 @@
+{
+  "format": 1,
+  "restore": {
+    "/data/2tb/emby_seer_plugin/tests/Inseerrtion.Tests/Inseerrtion.Tests.csproj": {}
+  },
+  "projects": {
+    "/data/2tb/emby_seer_plugin/src/Inseerrtion/Inseerrtion.csproj": {
+      "version": "0.1.0",
+      "restore": {
+        "projectUniqueName": "/data/2tb/emby_seer_plugin/src/Inseerrtion/Inseerrtion.csproj",
+        "projectName": "Inseerrtion",
+        "projectPath": "/data/2tb/emby_seer_plugin/src/Inseerrtion/Inseerrtion.csproj",
+        "packagesPath": "/home/zac@ashurtech.net/.nuget/packages/",
+        "outputPath": "/data/2tb/emby_seer_plugin/src/Inseerrtion/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/zac@ashurtech.net/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "netstandard2.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "netstandard2.0": {
+            "targetAlias": "netstandard2.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "netstandard2.0": {
+          "targetAlias": "netstandard2.0",
+          "dependencies": {
+            "NETStandard.Library": {
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[2.0.3, )",
+              "autoReferenced": true
+            },
+            "System.Memory": {
+              "target": "Package",
+              "version": "[4.5.6, )"
+            },
+            "System.Text.Json": {
+              "target": "Package",
+              "version": "[8.0.5, )"
+            },
+            "mediabrowser.server.core": {
+              "target": "Package",
+              "version": "[4.10.0.1-beta, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/8.0.404/RuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "/data/2tb/emby_seer_plugin/tests/Inseerrtion.Tests/Inseerrtion.Tests.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/data/2tb/emby_seer_plugin/tests/Inseerrtion.Tests/Inseerrtion.Tests.csproj",
+        "projectName": "Inseerrtion.Tests",
+        "projectPath": "/data/2tb/emby_seer_plugin/tests/Inseerrtion.Tests/Inseerrtion.Tests.csproj",
+        "packagesPath": "/home/zac@ashurtech.net/.nuget/packages/",
+        "outputPath": "/data/2tb/emby_seer_plugin/tests/Inseerrtion.Tests/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/zac@ashurtech.net/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "/data/2tb/emby_seer_plugin/src/Inseerrtion/Inseerrtion.csproj": {
+                "projectPath": "/data/2tb/emby_seer_plugin/src/Inseerrtion/Inseerrtion.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "FluentAssertions": {
+              "target": "Package",
+              "version": "[6.12.0, )"
+            },
+            "Microsoft.NET.Test.Sdk": {
+              "target": "Package",
+              "version": "[17.8.0, )"
+            },
+            "NSubstitute": {
+              "target": "Package",
+              "version": "[5.1.0, )"
+            },
+            "coverlet.collector": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[6.0.0, )"
+            },
+            "xunit": {
+              "target": "Package",
+              "version": "[2.6.2, )"
+            },
+            "xunit.runner.visualstudio": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[2.5.4, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.AspNetCore.App.Ref",
+              "version": "[8.0.11, 8.0.11]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Ref",
+              "version": "[8.0.11, 8.0.11]"
+            }
+          ],
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/8.0.404/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

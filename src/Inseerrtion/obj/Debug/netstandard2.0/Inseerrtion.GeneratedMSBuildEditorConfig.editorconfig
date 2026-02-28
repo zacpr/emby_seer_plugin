@@ -1,0 +1,5 @@
+is_global = true
+build_property.RootNamespace = Inseerrtion
+build_property.ProjectDir = /data/2tb/emby_seer_plugin/src/Inseerrtion/
+build_property.EnableComHosting = 
+build_property.EnableGeneratedComInterfaceComImportInterop = 

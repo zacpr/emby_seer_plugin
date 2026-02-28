@@ -1,0 +1,10 @@
+/data/2tb/emby_seer_plugin/src/Inseerrtion/bin/Release/netstandard2.0/Inseerrtion.deps.json
+/data/2tb/emby_seer_plugin/src/Inseerrtion/bin/Release/netstandard2.0/Inseerrtion.dll
+/data/2tb/emby_seer_plugin/src/Inseerrtion/bin/Release/netstandard2.0/Inseerrtion.pdb
+/data/2tb/emby_seer_plugin/src/Inseerrtion/obj/Release/netstandard2.0/Inseerrtion.csproj.AssemblyReference.cache
+/data/2tb/emby_seer_plugin/src/Inseerrtion/obj/Release/netstandard2.0/Inseerrtion.GeneratedMSBuildEditorConfig.editorconfig
+/data/2tb/emby_seer_plugin/src/Inseerrtion/obj/Release/netstandard2.0/Inseerrtion.AssemblyInfoInputs.cache
+/data/2tb/emby_seer_plugin/src/Inseerrtion/obj/Release/netstandard2.0/Inseerrtion.AssemblyInfo.cs
+/data/2tb/emby_seer_plugin/src/Inseerrtion/obj/Release/netstandard2.0/Inseerrtion.csproj.CoreCompileInputs.cache
+/data/2tb/emby_seer_plugin/src/Inseerrtion/obj/Release/netstandard2.0/Inseerrtion.dll
+/data/2tb/emby_seer_plugin/src/Inseerrtion/obj/Release/netstandard2.0/Inseerrtion.pdb
