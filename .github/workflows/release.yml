@@ -28,11 +28,13 @@ jobs:
       run: |
         VERSION=${GITHUB_REF#refs/tags/v}
         echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Version: $VERSION"
 
     - name: Update version in .csproj
       run: |
         sed -i 's/<Version>.*<\/Version>/<Version>${{ steps.get_version.outputs.VERSION }}<\/Version>/' src/Inseerrtion/Inseerrtion.csproj
+        cat src/Inseerrtion/Inseerrtion.csproj | grep -A 1 -B 1 "<Version>"
 
     - name: Restore dependencies
       run: dotnet restore
@@ -45,26 +47,41 @@ jobs:
 
     - name: Create plugin package
       run: |
+        # Create release directory structure
         mkdir -p ./release/Inseerrtion
+        
+        # Copy built files
         cp src/Inseerrtion/bin/Release/netstandard2.0/Inseerrtion.dll ./release/Inseerrtion/
-        cp src/Inseerrtion/bin/Release/netstandard2.0/Inseerrtion.pdb ./release/Inseerrtion/
+        cp src/Inseerrtion/bin/Release/netstandard2.0/Inseerrtion.pdb ./release/Inseerrtion/ 2>/dev/null || echo "No PDB file found"
+        
+        # Get current timestamp
+        TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
         
         # Create meta.json for Emby plugin catalog
-        cat > ./release/Inseerrtion/meta.json << 'EOF'
+        cat > ./release/Inseerrtion/meta.json << EOF
         {
           "name": "Inseerrtion",
           "description": "Integrate Seerr media requests directly into Emby",
           "version": "${{ steps.get_version.outputs.VERSION }}",
           "targetAbi": "4.10.0.0",
           "sourceUrl": "https://github.com/${{ github.repository }}",
-          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "timestamp": "$TIMESTAMP",
           "guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
         }
         EOF
         
+        # Verify files
+        echo "Files in release directory:"
+        ls -la ./release/Inseerrtion/
+        
+        # Create ZIP package
         cd ./release
         zip -r ../Inseerrtion-${{ steps.get_version.outputs.VERSION }}.zip Inseerrtion/
         cd ..
+        
+        # Verify ZIP was created
+        echo "ZIP file created:"
+        ls -la Inseerrtion-${{ steps.get_version.outputs.VERSION }}.zip
 
     - name: Generate release notes
       id: release_notes
@@ -77,33 +94,42 @@ jobs:
           CHANGES=$(git log --pretty=format:"- %s" --no-merges $LAST_TAG..HEAD)
         fi
         
-        cat > RELEASE_NOTES.md << EOF
-        ## Inseerrtion v${{ steps.get_version.outputs.VERSION }}
+        # Handle empty changes
+        if [ -z "$CHANGES" ]; then
+          CHANGES="- Maintenance release"
+        fi
         
+        cat > RELEASE_NOTES.md << 'EOF'
+        ## Inseerrtion v${{ steps.get_version.outputs.VERSION }}
+
         ### Changes
         $CHANGES
-        
+
         ### Installation
-        1. Download the ZIP file
+        1. Download the ZIP file (`Inseerrtion-${{ steps.get_version.outputs.VERSION }}.zip`)
         2. Extract to your Emby plugins folder:
-           - Windows: \`%ProgramData%\\Emby-Server\\plugins\\\`
-           - Linux/macOS: \`/var/lib/emby/plugins/\` or \`~/.config/emby-server/plugins/\`
+           - Windows: `%ProgramData%\Emby-Server\plugins\`
+           - Linux/macOS: `/var/lib/emby/plugins/` or `~/.config/emby-server/plugins/`
         3. Restart Emby server
         4. Configure the plugin in Emby Dashboard → Plugins → Inseerrtion
-        
+
         ### Requirements
         - Emby Server 4.10.0 or higher
         - Seerr instance (v1.x or higher)
-        
+
         ### Configuration
         1. Go to Dashboard → Plugins → Inseerrtion
         2. Enter your Seerr URL (e.g., http://localhost:5055)
         3. Enter your Seerr API Key (from Seerr Settings → General → API Key)
         4. Click Save to test the connection
         EOF
+        
+        # Show release notes
+        echo "Generated release notes:"
+        cat RELEASE_NOTES.md
 
     - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         name: Inseerrtion v${{ steps.get_version.outputs.VERSION }}
         body_path: RELEASE_NOTES.md
@@ -111,6 +137,8 @@ jobs:
           Inseerrtion-${{ steps.get_version.outputs.VERSION }}.zip
         draft: false
         prerelease: ${{ contains(steps.get_version.outputs.VERSION, '-') }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Upload release artifact
       uses: actions/upload-artifact@v4
