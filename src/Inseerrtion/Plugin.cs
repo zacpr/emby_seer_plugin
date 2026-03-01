@@ -53,7 +53,8 @@ namespace Inseerrtion
                 {
                     throw new ArgumentNullException(nameof(logManager));
                 }
-                _logger = logManager.GetLogger(Name);
+                // Use hardcoded name since base class properties may not be initialized yet
+                _logger = logManager.GetLogger("Inseerrtion");
                 if (_logger == null)
                 {
                     throw new InvalidOperationException("Logger is null");
