@@ -63,7 +63,10 @@ namespace Inseerrtion.Services
                 if (Uri.TryCreate(_configuration.SeerrBaseUrl, UriKind.Absolute, out var uri))
                 {
                     _httpClient.BaseAddress = uri;
-                    _httpClient.DefaultRequestHeaders.Add("X-Api-Key", _configuration.SeerrApiKey);
+                    if (!_httpClient.DefaultRequestHeaders.Contains("X-Api-Key"))
+                    {
+                        _httpClient.DefaultRequestHeaders.Add("X-Api-Key", _configuration.SeerrApiKey);
+                    }
                 }
             }
         }

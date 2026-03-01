@@ -8,3 +8,4 @@
 /data/2tb/emby_seer_plugin/src/Inseerrtion/bin/Debug/netstandard2.0/Inseerrtion.pdb
 /data/2tb/emby_seer_plugin/src/Inseerrtion/obj/Debug/netstandard2.0/Inseerrtion.dll
 /data/2tb/emby_seer_plugin/src/Inseerrtion/obj/Debug/netstandard2.0/Inseerrtion.pdb
+/data/2tb/emby_seer_plugin/src/Inseerrtion/obj/Debug/netstandard2.0/Inseerrtion.sourcelink.json

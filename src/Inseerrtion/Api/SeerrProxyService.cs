@@ -173,14 +173,17 @@ namespace Inseerrtion.Api
         {
             _logger.Debug("Health check requested");
 
-            var isConfigured = !string.IsNullOrWhiteSpace(_plugin.Configuration.SeerrBaseUrl) 
-                && !string.IsNullOrWhiteSpace(_plugin.Configuration.SeerrApiKey);
+            // Safely access plugin configuration
+            var config = _plugin?.Configuration;
+            var isConfigured = config != null 
+                && !string.IsNullOrWhiteSpace(config.SeerrBaseUrl) 
+                && !string.IsNullOrWhiteSpace(config.SeerrApiKey);
 
             var response = new HealthResponse
             {
                 IsHealthy = isConfigured,
                 IsSeerrConnected = false,
-                Version = _plugin.Version.ToString(),
+                Version = _plugin?.Version?.ToString() ?? "unknown",
                 Timestamp = DateTime.UtcNow
             };
 
@@ -193,7 +196,14 @@ namespace Inseerrtion.Api
             // Try to connect to Seerr
             try
             {
-                using var client = new SeerrClient(_logger, _plugin.Configuration);
+                // config is already retrieved above, reuse it
+                if (config == null)
+                {
+                    response.Message = "Plugin configuration is not available";
+                    return response;
+                }
+                
+                using var client = new SeerrClient(_logger, config);
                 var status = await client.GetStatusAsync();
 
                 if (status != null)
@@ -236,7 +246,20 @@ namespace Inseerrtion.Api
 
             try
             {
-                using var client = new SeerrClient(_logger, _plugin.Configuration);
+                var config = _plugin?.Configuration;
+                if (config == null)
+                {
+                    _logger.Error("Plugin configuration is not available for search");
+                    return new SearchResponse
+                    {
+                        Page = request.Page,
+                        TotalPages = 0,
+                        TotalResults = 0,
+                        Results = Array.Empty<SearchResultItem>()
+                    };
+                }
+                
+                using var client = new SeerrClient(_logger, config);
                 var results = await client.SearchAsync(request.Query, request.Page);
 
                 if (results == null)

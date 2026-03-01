@@ -60,7 +60,7 @@ namespace Inseerrtion
                     throw new InvalidOperationException("Logger is null");
                 }
                 
-                _logger.Info("Inseerrtion plugin loaded - version {0}", Version.ToString());
+                _logger.Info("Inseerrtion plugin loaded - version 0.1.0");
             }
             catch (Exception ex)
             {

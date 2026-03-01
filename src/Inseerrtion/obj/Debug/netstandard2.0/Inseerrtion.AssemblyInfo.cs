@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyDescriptionAttribute("Emby plugin that embeds Seerr discovery and request flows inside Emby\'s web UI")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("0.1.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.1.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.1.0+203b87528aabd6a861672ba300e2826564c075ae")]
 [assembly: System.Reflection.AssemblyProductAttribute("Inseerrtion")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Inseerrtion")]
 [assembly: System.Reflection.AssemblyVersionAttribute("0.1.0.0")]

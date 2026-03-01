@@ -58,8 +58,14 @@ namespace Inseerrtion.UI.Search
             // Handle request button on a result item
             else if (commandId != null && commandId.StartsWith("Request_"))
             {
-                var mediaId = int.Parse(commandId.Replace("Request_", ""));
-                await RequestMediaAsync(mediaId);
+                if (int.TryParse(commandId.Replace("Request_", ""), out var mediaId))
+                {
+                    await RequestMediaAsync(mediaId);
+                }
+                else
+                {
+                    _logger.Error("Invalid media ID format in command: {0}", commandId);
+                }
             }
 
             RaiseUIViewInfoChanged();
