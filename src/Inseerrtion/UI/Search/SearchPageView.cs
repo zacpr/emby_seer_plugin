@@ -33,10 +33,16 @@ namespace Inseerrtion.UI.Search
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _plugin = plugin ?? throw new ArgumentNullException(nameof(plugin));
 
+            // Disable default save button - we use custom buttons
+            ShowSave = false;
+            AllowSave = false;
+
             ContentData = new SearchPageUI
             {
                 SearchResults = new List<SearchResultItemUI>()
             };
+            
+            _logger.Info("SearchPageView initialized");
         }
 
         /// <summary>
@@ -45,18 +51,30 @@ namespace Inseerrtion.UI.Search
         public SearchPageUI SearchUI => (SearchPageUI)ContentData;
 
         /// <inheritdoc />
+        public override bool IsCommandAllowed(string commandKey)
+        {
+            _logger.Info("IsCommandAllowed called: {0}", commandKey ?? "null");
+            return true;
+        }
+
         public override async Task<IPluginUIView> OnSaveCommand(string itemId, string commandId, string data)
         {
             _logger.Info("OnSaveCommand called: itemId={0}, commandId={1}, data={2}", itemId ?? "null", commandId ?? "null", data ?? "null");
 
-            // Handle search button
+            // Handle search button - check various possible command formats
             if (commandId == nameof(SearchPageUI.SearchButton) || 
+                commandId == "Search" ||
+                itemId == nameof(SearchPageUI.SearchButton) ||
                 (itemId == nameof(SearchPageUI.SearchQuery) && !string.IsNullOrWhiteSpace(SearchUI.SearchQuery)))
             {
+                _logger.Info("Triggering search from OnSaveCommand");
                 await PerformSearchAsync();
+                RaiseUIViewInfoChanged();
+                return this;
             }
+            
             // Handle request button on a result item
-            else if (commandId != null && commandId.StartsWith("Request_"))
+            if (commandId != null && commandId.StartsWith("Request_"))
             {
                 if (int.TryParse(commandId.Replace("Request_", ""), out var mediaId))
                 {
@@ -66,9 +84,10 @@ namespace Inseerrtion.UI.Search
                 {
                     _logger.Error("Invalid media ID format in command: {0}", commandId);
                 }
+                RaiseUIViewInfoChanged();
+                return this;
             }
 
-            RaiseUIViewInfoChanged();
             return await base.OnSaveCommand(itemId, commandId, data);
         }
 

@@ -18,6 +18,7 @@ namespace Inseerrtion.UI.Search
         {
             SearchQuery = string.Empty;
             SearchResults = new List<SearchResultItemUI>();
+            System.Console.WriteLine("SearchPageUI initialized");
         }
 
         /// <inheritdoc />
