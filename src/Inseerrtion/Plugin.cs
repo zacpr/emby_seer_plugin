@@ -25,7 +25,7 @@ namespace Inseerrtion
         private readonly ILogger _logger;
         private UserMappingService? _userMappingService;
         private readonly IServerApplicationHost _applicationHost;
-        private readonly IApplicationPaths _applicationPaths;
+        private IApplicationPaths _applicationPaths;
         private List<IPluginUIPageController>? _pages;
 
         // Plugin ID - MUST be unique and stable
@@ -34,22 +34,30 @@ namespace Inseerrtion
         /// <summary>
         /// Initializes a new instance of the <see cref="Plugin"/> class.
         /// </summary>
-        /// <param name="applicationPaths">The application paths.</param>
-        /// <param name="xmlSerializer">The XML serializer.</param>
-        /// <param name="logManager">The log manager.</param>
-        /// <param name="applicationHost">The application host.</param>
         public Plugin(
-            IApplicationPaths? applicationPaths,
+            IApplicationPaths applicationPaths,
             IXmlSerializer xmlSerializer,
             ILogManager logManager,
             IServerApplicationHost applicationHost)
-            : base(applicationPaths ?? CreateApplicationPathsSafe(applicationHost), xmlSerializer)
+            : base(ResolveApplicationPaths(applicationPaths, applicationHost), xmlSerializer)
         {
             try
             {
                 _applicationHost = applicationHost ?? throw new ArgumentNullException(nameof(applicationHost));
-                _applicationPaths = applicationPaths ?? CreateApplicationPathsSafe(applicationHost);
-                _logger = logManager?.GetLogger(Name) ?? throw new ArgumentNullException(nameof(logManager));
+                
+                // Store the resolved paths
+                _applicationPaths = applicationPaths ?? FallbackApplicationPaths.Create();
+                
+                // Initialize logger
+                if (logManager == null)
+                {
+                    throw new ArgumentNullException(nameof(logManager));
+                }
+                _logger = logManager.GetLogger(Name);
+                if (_logger == null)
+                {
+                    throw new InvalidOperationException("Logger is null");
+                }
                 
                 _logger.Info("Inseerrtion plugin loaded - version {0}", Version.ToString());
             }
@@ -61,258 +69,41 @@ namespace Inseerrtion
         }
 
         /// <summary>
-        /// Creates an IApplicationPaths instance safely with fallback.
+        /// Resolves IApplicationPaths, using fallback if needed.
         /// </summary>
-        private static IApplicationPaths CreateApplicationPathsSafe(IServerApplicationHost host)
+        private static IApplicationPaths ResolveApplicationPaths(IApplicationPaths? provided, IServerApplicationHost host)
         {
+            if (provided != null)
+            {
+                Console.WriteLine("Inseerrtion: Using provided IApplicationPaths");
+                return provided;
+            }
+
             try
             {
-                if (host == null)
+                if (host != null)
                 {
-                    Console.WriteLine("WARNING: IServerApplicationHost is null, using fallback paths");
-                    return new FallbackApplicationPaths();
-                }
-
-                // Try to get paths from the host via reflection
-                var hostType = host.GetType();
-                
-                // Try to find a property that returns IApplicationPaths
-                var pathsProperty = hostType.GetProperty("ApplicationPaths") 
-                    ?? hostType.GetProperty("Paths")
-                    ?? hostType.GetProperty("ApplicationHost");
-                    
-                if (pathsProperty != null)
-                {
-                    try
+                    // Try to get from host properties
+                    var hostType = host.GetType();
+                    var prop = hostType.GetProperty("ApplicationPaths");
+                    if (prop != null)
                     {
-                        var value = pathsProperty.GetValue(host);
-                        if (value is IApplicationPaths paths)
+                        var val = prop.GetValue(host);
+                        if (val is IApplicationPaths paths)
                         {
-                            Console.WriteLine("Found IApplicationPaths via reflection property");
+                            Console.WriteLine("Inseerrtion: Found IApplicationPaths via reflection");
                             return paths;
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Failed to get property value: {ex.Message}");
-                    }
                 }
-
-                // Try to cast the host itself
-                if (host is IApplicationPaths hostPaths)
-                {
-                    Console.WriteLine("IServerApplicationHost implements IApplicationPaths directly");
-                    return hostPaths;
-                }
-
-                // Try to extract paths via reflection
-                return new ApplicationPathsFromHost(host);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"ERROR in CreateApplicationPaths: {ex}. Using fallback paths.");
-                return new FallbackApplicationPaths();
-            }
-        }
-
-        /// <summary>
-        /// Fallback implementation that uses default Emby paths.
-        /// </summary>
-        private class FallbackApplicationPaths : IApplicationPaths
-        {
-            private readonly string _programDataPath;
-
-            public FallbackApplicationPaths()
-            {
-                // Try common Emby data paths
-                _programDataPath = FindEmbyDataPath();
-                
-                Console.WriteLine($"Using fallback paths. Data path: {_programDataPath}");
-
-                // Ensure plugin config directory exists
-                try
-                {
-                    var configPath = Path.Combine(_programDataPath, "plugins", "configurations");
-                    if (!Directory.Exists(configPath))
-                        Directory.CreateDirectory(configPath);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Warning: Could not create config directory: {ex.Message}");
-                }
+                Console.WriteLine($"Inseerrtion: Reflection failed: {ex.Message}");
             }
 
-            private static string FindEmbyDataPath()
-            {
-                // Windows paths
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                {
-                    var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-                    var roamingAppData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-                    
-                    var paths = new[]
-                    {
-                        Path.Combine(roamingAppData, "Emby-Server", "programdata"),
-                        Path.Combine(localAppData, "Emby-Server", "programdata"),
-                        Path.Combine(roamingAppData, "Emby", "programdata"),
-                        @"C:\ProgramData\Emby-Server\programdata",
-                        @"C:\ProgramData\Emby\programdata",
-                    };
-
-                    foreach (var path in paths)
-                    {
-                        if (Directory.Exists(path))
-                        {
-                            Console.WriteLine($"Found existing Emby data path: {path}");
-                            return path;
-                        }
-                    }
-
-                    // Return first option even if it doesn't exist
-                    return paths[0];
-                }
-                
-                // Linux/macOS paths
-                var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-                var linuxPaths = new[]
-                {
-                    "/var/lib/emby/programdata",
-                    "/var/lib/emby-server/programdata",
-                    Path.Combine(home, ".config", "emby-server", "programdata"),
-                    Path.Combine(home, ".emby", "programdata"),
-                };
-
-                foreach (var path in linuxPaths)
-                {
-                    if (Directory.Exists(path))
-                        return path;
-                }
-
-                return linuxPaths[2]; // Default to ~/.config/emby-server/programdata
-            }
-
-            public string ProgramDataPath => _programDataPath;
-            public string DataPath => _programDataPath;
-            public string ProgramSystemPath => Path.GetDirectoryName(typeof(Plugin).Assembly.Location) ?? string.Empty;
-            public string PluginConfigurationsPath => Path.Combine(_programDataPath, "plugins", "configurations");
-            public string PluginsPath => Path.Combine(ProgramSystemPath, "plugins");
-            public string TempUpdatePath => Path.Combine(_programDataPath, "temp", "update");
-            public string SystemLogFilePath => Path.Combine(_programDataPath, "logs");
-            public string LogDirectoryPath => Path.Combine(_programDataPath, "logs");
-            public string ConfigurationFilePath => Path.Combine(_programDataPath, "config");
-            public string ApplicationResourcesPath => ProgramSystemPath;
-            public string VisualStudioPath => string.Empty;
-            public string ImageCachePath => Path.Combine(_programDataPath, "cache", "images");
-            public string ImageCaptureLocationsPath => Path.Combine(_programDataPath, "config", "imagecapture");
-            public string RootFolderPath => _programDataPath;
-            public string DefaultMetadataPath => Path.Combine(_programDataPath, "metadata");
-            public string VirtualDataPath => "/";
-            public string PlaylistFolderPath => Path.Combine(_programDataPath, "playlists");
-            public string SubtitlesPath => Path.Combine(_programDataPath, "subtitles");
-            public string FontsPath => Path.Combine(_programDataPath, "fonts");
-            public string ArtistsFolderPath => Path.Combine(_programDataPath, "artists");
-            public string GenreFolderPath => Path.Combine(_programDataPath, "genres");
-            public string StudioFolderPath => Path.Combine(_programDataPath, "studios");
-            public string YearFolderPath => Path.Combine(_programDataPath, "years");
-            public string GeneralCachePath => Path.Combine(_programDataPath, "cache");
-            public string MusicBrainzArtistPath => Path.Combine(_programDataPath, "musicbrainz", "artists");
-            public string MusicBrainzReleasePath => Path.Combine(_programDataPath, "musicbrainz", "releases");
-            public string BifTrashPath => Path.Combine(_programDataPath, "bif");
-            public string LavFiltersPath => Path.Combine(_programDataPath, "lavfilters");
-            public string TempDirectory => Path.Combine(_programDataPath, "temp");
-            public string ShutterEncoderPath => Path.Combine(_programDataPath, "shutterencoder");
-            public string DVDAssPath => Path.Combine(_programDataPath, "dvdass");
-            public string ConfigurationDirectoryPath => Path.Combine(_programDataPath, "config");
-            public string SystemConfigurationFilePath => Path.Combine(_programDataPath, "config", "system.xml");
-            public string CachePath => Path.Combine(_programDataPath, "cache");
-
-            public event EventHandler? CachePathChanged;
-
-            public ReadOnlySpan<char> GetImageCachePath() => ImageCachePath.AsSpan();
-            public ReadOnlySpan<char> GetCachePath() => CachePath.AsSpan();
-        }
-
-        /// <summary>
-        /// Wrapper that extracts IApplicationPaths properties from IServerApplicationHost via reflection.
-        /// </summary>
-        private class ApplicationPathsFromHost : IApplicationPaths
-        {
-            private readonly IServerApplicationHost _host;
-            private readonly string _programDataPath;
-
-            public ApplicationPathsFromHost(IServerApplicationHost host)
-            {
-                _host = host ?? throw new ArgumentNullException(nameof(host));
-                
-                // Try to get ProgramDataPath from host via reflection
-                var hostType = host.GetType();
-                
-                _programDataPath = GetPropertyValue(host, "ProgramDataPath") 
-                    ?? GetPropertyValue(host, "DataPath")
-                    ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Emby-Server", "programdata");
-
-                // Ensure plugin config directory exists
-                try
-                {
-                    var configPath = Path.Combine(_programDataPath, "plugins", "configurations");
-                    if (!Directory.Exists(configPath))
-                        Directory.CreateDirectory(configPath);
-                }
-                catch { /* Ignore errors creating directory */ }
-            }
-
-            private static string? GetPropertyValue(object obj, string propertyName)
-            {
-                try
-                {
-                    var prop = obj.GetType().GetProperty(propertyName);
-                    return prop?.GetValue(obj)?.ToString();
-                }
-                catch
-                {
-                    return null;
-                }
-            }
-
-            public string ProgramDataPath => _programDataPath;
-            public string DataPath => _programDataPath;
-            public string ProgramSystemPath => Path.GetDirectoryName(typeof(Plugin).Assembly.Location) ?? string.Empty;
-            public string PluginConfigurationsPath => Path.Combine(_programDataPath, "plugins", "configurations");
-            public string PluginsPath => Path.Combine(ProgramSystemPath, "plugins");
-            public string TempUpdatePath => Path.Combine(_programDataPath, "temp", "update");
-            public string SystemLogFilePath => Path.Combine(_programDataPath, "logs");
-            public string LogDirectoryPath => Path.Combine(_programDataPath, "logs");
-            public string ConfigurationFilePath => Path.Combine(_programDataPath, "config");
-            public string ApplicationResourcesPath => ProgramSystemPath;
-            public string VisualStudioPath => string.Empty;
-            public string ImageCachePath => Path.Combine(_programDataPath, "cache", "images");
-            public string ImageCaptureLocationsPath => Path.Combine(_programDataPath, "config", "imagecapture");
-            public string RootFolderPath => _programDataPath;
-            public string DefaultMetadataPath => Path.Combine(_programDataPath, "metadata");
-            public string VirtualDataPath => "/";
-            public string PlaylistFolderPath => Path.Combine(_programDataPath, "playlists");
-            public string SubtitlesPath => Path.Combine(_programDataPath, "subtitles");
-            public string FontsPath => Path.Combine(_programDataPath, "fonts");
-            public string ArtistsFolderPath => Path.Combine(_programDataPath, "artists");
-            public string GenreFolderPath => Path.Combine(_programDataPath, "genres");
-            public string StudioFolderPath => Path.Combine(_programDataPath, "studios");
-            public string YearFolderPath => Path.Combine(_programDataPath, "years");
-            public string GeneralCachePath => Path.Combine(_programDataPath, "cache");
-            public string MusicBrainzArtistPath => Path.Combine(_programDataPath, "musicbrainz", "artists");
-            public string MusicBrainzReleasePath => Path.Combine(_programDataPath, "musicbrainz", "releases");
-            public string BifTrashPath => Path.Combine(_programDataPath, "bif");
-            public string LavFiltersPath => Path.Combine(_programDataPath, "lavfilters");
-            public string TempDirectory => Path.Combine(_programDataPath, "temp");
-            public string ShutterEncoderPath => Path.Combine(_programDataPath, "shutterencoder");
-            public string DVDAssPath => Path.Combine(_programDataPath, "dvdass");
-            public string ConfigurationDirectoryPath => Path.Combine(_programDataPath, "config");
-            public string SystemConfigurationFilePath => Path.Combine(_programDataPath, "config", "system.xml");
-            public string CachePath => Path.Combine(_programDataPath, "cache");
-
-            public event EventHandler? CachePathChanged;
-
-            public ReadOnlySpan<char> GetImageCachePath() => ImageCachePath.AsSpan();
-            public ReadOnlySpan<char> GetCachePath() => CachePath.AsSpan();
+            Console.WriteLine("Inseerrtion: Using fallback application paths");
+            return FallbackApplicationPaths.Create();
         }
 
         /// <summary>
@@ -385,7 +176,6 @@ namespace Inseerrtion
         /// <summary>
         /// Creates the plugin info.
         /// </summary>
-        /// <returns>The plugin info.</returns>
         private PluginInfo CreatePluginInfo()
         {
             return new PluginInfo
@@ -395,6 +185,123 @@ namespace Inseerrtion
                 Version = Version.ToString(),
                 Description = Description
             };
+        }
+
+        /// <summary>
+        /// Fallback implementation for when IApplicationPaths is not available.
+        /// </summary>
+        private class FallbackApplicationPaths : IApplicationPaths
+        {
+            private readonly string _dataPath;
+
+            public static FallbackApplicationPaths Create()
+            {
+                return new FallbackApplicationPaths();
+            }
+
+            public FallbackApplicationPaths()
+            {
+                _dataPath = FindEmbyDataPath();
+                Console.WriteLine($"Inseerrtion FallbackApplicationPaths: Using {_dataPath}");
+                
+                try
+                {
+                    var configDir = Path.Combine(_dataPath, "plugins", "configurations");
+                    if (!Directory.Exists(configDir))
+                    {
+                        Directory.CreateDirectory(configDir);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Inseerrtion: Warning - could not create config dir: {ex.Message}");
+                }
+            }
+
+            private static string FindEmbyDataPath()
+            {
+                // Windows
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                    var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                    
+                    var candidates = new[]
+                    {
+                        Path.Combine(appData, "Emby-Server", "programdata"),
+                        Path.Combine(localAppData, "Emby-Server", "programdata"),
+                        @"C:\ProgramData\Emby-Server\programdata",
+                    };
+                    
+                    foreach (var c in candidates)
+                    {
+                        if (Directory.Exists(c))
+                        {
+                            Console.WriteLine($"Inseerrtion: Found existing data path: {c}");
+                            return c;
+                        }
+                    }
+                    
+                    return candidates[0];
+                }
+                
+                // Linux
+                var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                var linuxCandidates = new[]
+                {
+                    "/var/lib/emby/programdata",
+                    "/var/lib/emby-server/programdata",
+                    Path.Combine(home, ".config", "emby-server", "programdata"),
+                };
+                
+                foreach (var c in linuxCandidates)
+                {
+                    if (Directory.Exists(c))
+                        return c;
+                }
+                
+                return linuxCandidates[2];
+            }
+
+            public string ProgramDataPath => _dataPath;
+            public string DataPath => _dataPath;
+            public string ProgramSystemPath => Path.GetDirectoryName(typeof(Plugin).Assembly.Location) ?? "";
+            public string PluginConfigurationsPath => Path.Combine(_dataPath, "plugins", "configurations");
+            public string PluginsPath => Path.Combine(ProgramSystemPath, "plugins");
+            public string TempUpdatePath => Path.Combine(_dataPath, "temp", "update");
+            public string SystemLogFilePath => Path.Combine(_dataPath, "logs");
+            public string LogDirectoryPath => Path.Combine(_dataPath, "logs");
+            public string ConfigurationFilePath => Path.Combine(_dataPath, "config");
+            public string ApplicationResourcesPath => ProgramSystemPath;
+            public string VisualStudioPath => "";
+            public string ImageCachePath => Path.Combine(_dataPath, "cache", "images");
+            public string ImageCaptureLocationsPath => Path.Combine(_dataPath, "config", "imagecapture");
+            public string RootFolderPath => _dataPath;
+            public string DefaultMetadataPath => Path.Combine(_dataPath, "metadata");
+            public string VirtualDataPath => "/";
+            public string PlaylistFolderPath => Path.Combine(_dataPath, "playlists");
+            public string SubtitlesPath => Path.Combine(_dataPath, "subtitles");
+            public string FontsPath => Path.Combine(_dataPath, "fonts");
+            public string ArtistsFolderPath => Path.Combine(_dataPath, "artists");
+            public string GenreFolderPath => Path.Combine(_dataPath, "genres");
+            public string StudioFolderPath => Path.Combine(_dataPath, "studios");
+            public string YearFolderPath => Path.Combine(_dataPath, "years");
+            public string GeneralCachePath => Path.Combine(_dataPath, "cache");
+            public string MusicBrainzArtistPath => Path.Combine(_dataPath, "musicbrainz", "artists");
+            public string MusicBrainzReleasePath => Path.Combine(_dataPath, "musicbrainz", "releases");
+            public string BifTrashPath => Path.Combine(_dataPath, "bif");
+            public string LavFiltersPath => Path.Combine(_dataPath, "lavfilters");
+            public string TempDirectory => Path.Combine(_dataPath, "temp");
+            public string ShutterEncoderPath => Path.Combine(_dataPath, "shutterencoder");
+            public string DVDAssPath => Path.Combine(_dataPath, "dvdass");
+            public string ConfigurationDirectoryPath => Path.Combine(_dataPath, "config");
+            public string SystemConfigurationFilePath => Path.Combine(_dataPath, "config", "system.xml");
+            public string CachePath => Path.Combine(_dataPath, "cache");
+
+            public event EventHandler? CachePathChanged;
+
+            public ReadOnlySpan<char> GetImageCachePath() => ImageCachePath.AsSpan();
+            public ReadOnlySpan<char> GetCachePath() => CachePath.AsSpan();
         }
     }
 }
