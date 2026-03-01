@@ -48,6 +48,10 @@ namespace Inseerrtion
                 // Store the resolved paths
                 _applicationPaths = applicationPaths ?? FallbackApplicationPaths.Create();
                 
+                // Log where configuration is being stored
+                Console.WriteLine($"Inseerrtion: PluginConfigurationsPath = {_applicationPaths.PluginConfigurationsPath}");
+                Console.WriteLine($"Inseerrtion: Configuration will be saved to: {Path.Combine(_applicationPaths.PluginConfigurationsPath, "Inseerrtion.xml")}");
+                
                 // Initialize logger
                 if (logManager == null)
                 {
@@ -61,6 +65,19 @@ namespace Inseerrtion
                 }
                 
                 _logger.Info("Inseerrtion plugin loaded - version 0.1.0");
+                
+                // Log configuration status
+                var config = Configuration;
+                if (config != null)
+                {
+                    _logger.Info("Configuration loaded - Seerr URL: {0}, Has API Key: {1}", 
+                        string.IsNullOrEmpty(config.SeerrBaseUrl) ? "(not set)" : config.SeerrBaseUrl,
+                        !string.IsNullOrEmpty(config.SeerrApiKey));
+                }
+                else
+                {
+                    _logger.Warn("Configuration is null after loading");
+                }
             }
             catch (Exception ex)
             {
@@ -173,6 +190,8 @@ namespace Inseerrtion
             _logger.Info("Inseerrtion plugin is being uninstalled");
             base.OnUninstalling();
         }
+
+        
 
         /// <summary>
         /// Creates the plugin info.
