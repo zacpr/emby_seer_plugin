@@ -47,7 +47,7 @@ namespace Inseerrtion.UI.Search
         /// <inheritdoc />
         public override async Task<IPluginUIView> OnSaveCommand(string itemId, string commandId, string data)
         {
-            _logger.Debug("Search page command: itemId={0}, commandId={1}", itemId, commandId);
+            _logger.Info("OnSaveCommand called: itemId={0}, commandId={1}, data={2}", itemId ?? "null", commandId ?? "null", data ?? "null");
 
             // Handle search button
             if (commandId == nameof(SearchPageUI.SearchButton) || 
@@ -75,7 +75,7 @@ namespace Inseerrtion.UI.Search
         /// <inheritdoc />
         public override async Task<IPluginUIView?> RunCommand(string itemId, string commandId, string data)
         {
-            _logger.Debug("RunCommand: itemId={0}, commandId={1}", itemId, commandId);
+            _logger.Info("RunCommand called: itemId={0}, commandId={1}, data={2}", itemId ?? "null", commandId ?? "null", data ?? "null");
 
             // Handle button clicks
             if (commandId == nameof(SearchPageUI.SearchButton))
@@ -108,10 +108,13 @@ namespace Inseerrtion.UI.Search
         private async Task PerformSearchAsync()
         {
             var query = SearchUI.SearchQuery?.Trim();
+            _logger.Info("PerformSearchAsync called with query: '{0}'", query ?? "(null)");
+            
             if (string.IsNullOrWhiteSpace(query))
             {
                 SearchUI.SearchStatus.StatusText = "Please enter a search term";
                 SearchUI.SearchStatus.Status = ItemStatus.Warning;
+                _logger.Warn("Search query is empty");
                 return;
             }
 
@@ -122,8 +125,29 @@ namespace Inseerrtion.UI.Search
 
             try
             {
-                using var client = new SeerrClient(_logger, _plugin.Configuration);
+                var config = _plugin?.Configuration;
+                if (config == null)
+                {
+                    _logger.Error("Plugin configuration is null");
+                    SearchUI.SearchStatus.StatusText = "Configuration not loaded";
+                    SearchUI.SearchStatus.Status = ItemStatus.Failed;
+                    return;
+                }
+                
+                _logger.Info("Creating SeerrClient with URL: '{0}'", config.SeerrBaseUrl ?? "(not set)");
+                using var client = new SeerrClient(_logger, config);
+                
+                if (!client.IsConfigured)
+                {
+                    _logger.Error("SeerrClient is not configured - check URL and API key");
+                    SearchUI.SearchStatus.StatusText = "Seerr not configured - check plugin settings";
+                    SearchUI.SearchStatus.Status = ItemStatus.Failed;
+                    return;
+                }
+                
+                _logger.Info("Calling Seerr API search with query: '{0}'", query);
                 var results = await client.SearchAsync(query, 1);
+                _logger.Info("Search returned {0} results", results?.Results?.Length ?? 0);
 
                 if (results?.Results == null || results.Results.Length == 0)
                 {
