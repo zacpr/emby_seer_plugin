@@ -33,20 +33,21 @@ namespace Inseerrtion
         /// <summary>
         /// Initializes a new instance of the <see cref="Plugin"/> class.
         /// </summary>
+        /// <param name="applicationPaths">The application paths.</param>
         /// <param name="xmlSerializer">The XML serializer.</param>
         /// <param name="logManager">The log manager.</param>
-        /// <param name="applicationHost">The application host (also provides IApplicationPaths).</param>
+        /// <param name="applicationHost">The application host.</param>
         public Plugin(
+            IApplicationPaths? applicationPaths,
             IXmlSerializer xmlSerializer,
             ILogManager logManager,
             IServerApplicationHost applicationHost)
-            : base(GetApplicationPaths(applicationHost), xmlSerializer)
+            : base(applicationPaths ?? CreateApplicationPaths(applicationHost), xmlSerializer)
         {
             try
             {
                 _applicationHost = applicationHost ?? throw new ArgumentNullException(nameof(applicationHost));
-                _applicationPaths = (applicationHost as IApplicationPaths) 
-                    ?? throw new InvalidOperationException("IServerApplicationHost must implement IApplicationPaths");
+                _applicationPaths = applicationPaths ?? CreateApplicationPaths(applicationHost);
                 _logger = logManager?.GetLogger(Name) ?? throw new ArgumentNullException(nameof(logManager));
                 
                 _logger.Info("Inseerrtion plugin loaded - version {0}", Version.ToString());
@@ -59,20 +60,108 @@ namespace Inseerrtion
         }
 
         /// <summary>
-        /// Gets IApplicationPaths from the application host.
+        /// Creates an IApplicationPaths instance from the application host using reflection.
         /// </summary>
-        private static IApplicationPaths GetApplicationPaths(IServerApplicationHost host)
+        private static IApplicationPaths CreateApplicationPaths(IServerApplicationHost host)
         {
             if (host == null)
                 throw new ArgumentNullException(nameof(host));
+
+            // Try to get paths from the host via reflection
+            var hostType = host.GetType();
             
-            // Try to cast IServerApplicationHost to IApplicationPaths
-            if (host is IApplicationPaths paths)
-                return paths;
-            
-            throw new InvalidOperationException(
-                "IServerApplicationHost does not implement IApplicationPaths. " +
-                "This plugin requires an Emby version where the application host provides path information.");
+            // Try to find a property that returns IApplicationPaths
+            var pathsProperty = hostType.GetProperty("ApplicationPaths") 
+                ?? hostType.GetProperty("Paths")
+                ?? hostType.GetProperty("ApplicationHost");
+                
+            if (pathsProperty != null)
+            {
+                var value = pathsProperty.GetValue(host);
+                if (value is IApplicationPaths paths)
+                    return paths;
+            }
+
+            // Try to cast the host itself
+            if (host is IApplicationPaths hostPaths)
+                return hostPaths;
+
+            // Create a wrapper using reflection to get path properties from the host
+            return new ApplicationPathsFromHost(host);
+        }
+
+        /// <summary>
+        /// Wrapper that extracts IApplicationPaths properties from IServerApplicationHost via reflection.
+        /// </summary>
+        private class ApplicationPathsFromHost : IApplicationPaths
+        {
+            private readonly IServerApplicationHost _host;
+            private readonly string _programDataPath;
+
+            public ApplicationPathsFromHost(IServerApplicationHost host)
+            {
+                _host = host ?? throw new ArgumentNullException(nameof(host));
+                
+                // Try to get ProgramDataPath from host via reflection
+                var hostType = host.GetType();
+                
+                _programDataPath = GetPropertyValue(host, "ProgramDataPath") 
+                    ?? GetPropertyValue(host, "DataPath")
+                    ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Emby-Server", "programdata");
+
+                // Ensure plugin config directory exists
+                var configPath = Path.Combine(_programDataPath, "plugins", "configurations");
+                if (!Directory.Exists(configPath))
+                    Directory.CreateDirectory(configPath);
+            }
+
+            private static string? GetPropertyValue(object obj, string propertyName)
+            {
+                var prop = obj.GetType().GetProperty(propertyName);
+                return prop?.GetValue(obj)?.ToString();
+            }
+
+            public string ProgramDataPath => _programDataPath;
+            public string DataPath => _programDataPath;
+            public string ProgramSystemPath => Path.GetDirectoryName(typeof(Plugin).Assembly.Location) ?? string.Empty;
+            public string PluginConfigurationsPath => Path.Combine(_programDataPath, "plugins", "configurations");
+            public string PluginsPath => Path.Combine(ProgramSystemPath, "plugins");
+            public string TempUpdatePath => Path.Combine(_programDataPath, "temp", "update");
+            public string SystemLogFilePath => Path.Combine(_programDataPath, "logs");
+            public string LogDirectoryPath => Path.Combine(_programDataPath, "logs");
+            public string ConfigurationFilePath => Path.Combine(_programDataPath, "config");
+            public string ApplicationResourcesPath => ProgramSystemPath;
+            public string VisualStudioPath => string.Empty;
+            public string ImageCachePath => Path.Combine(_programDataPath, "cache", "images");
+            public string ImageCaptureLocationsPath => Path.Combine(_programDataPath, "config", "imagecapture");
+            public string RootFolderPath => _programDataPath;
+            public string DefaultMetadataPath => Path.Combine(_programDataPath, "metadata");
+            public string VirtualDataPath => "/";
+            public string PlaylistFolderPath => Path.Combine(_programDataPath, "playlists");
+            public string SubtitlesPath => Path.Combine(_programDataPath, "subtitles");
+            public string FontsPath => Path.Combine(_programDataPath, "fonts");
+            public string ArtistsFolderPath => Path.Combine(_programDataPath, "artists");
+            public string GenreFolderPath => Path.Combine(_programDataPath, "genres");
+            public string StudioFolderPath => Path.Combine(_programDataPath, "studios");
+            public string YearFolderPath => Path.Combine(_programDataPath, "years");
+            public string GeneralCachePath => Path.Combine(_programDataPath, "cache");
+            public string MusicBrainzArtistPath => Path.Combine(_programDataPath, "musicbrainz", "artists");
+            public string MusicBrainzReleasePath => Path.Combine(_programDataPath, "musicbrainz", "releases");
+            public string BifTrashPath => Path.Combine(_programDataPath, "bif");
+            public string LavFiltersPath => Path.Combine(_programDataPath, "lavfilters");
+            public string TempDirectory => Path.Combine(_programDataPath, "temp");
+            public string ShutterEncoderPath => Path.Combine(_programDataPath, "shutterencoder");
+            public string DVDAssPath => Path.Combine(_programDataPath, "dvdass");
+            public string ConfigurationDirectoryPath => Path.Combine(_programDataPath, "config");
+            public string SystemConfigurationFilePath => Path.Combine(_programDataPath, "config", "system.xml");
+            public string CachePath => Path.Combine(_programDataPath, "cache");
+
+#pragma warning disable CS8618 // Non-nullable event
+            public event EventHandler? CachePathChanged;
+#pragma warning restore CS8618
+
+            public ReadOnlySpan<char> GetImageCachePath() => ImageCachePath.AsSpan();
+            public ReadOnlySpan<char> GetCachePath() => CachePath.AsSpan();
         }
 
         /// <summary>
